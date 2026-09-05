@@ -64,7 +64,7 @@ function parsePayload(txt){
   throw new Error('Phản hồi không phải JSON');
 }
 
-// Gọi GAS: JSONP + fetch song song. opts.allowBeaconSuccess = vẫn OK sau timeout nếu chỉ cần kích hoạt server (in phiếu).
+// CHỈ 1 request (tránh bắn 4 lần sync song song → GAS treo/timeout)
 function callWebApp(url,cb,opts){
   opts=opts||{};
   var settled=false;
@@ -73,37 +73,46 @@ function callWebApp(url,cb,opts){
     settled=true;
     try{ cb(data); }catch(e){ console.error(e); }
   }
-  try{ new Image().src=url+(url.indexOf('?')>-1?'&':'?')+'_beacon=1'; }catch(e){}
-  try{ fetch(url+(url.indexOf('?')>-1?'&':'?')+'_nc=1',{method:'GET',mode:'no-cors',credentials:'omit',cache:'no-store',referrerPolicy:'no-referrer'}); }catch(e){}
-
-  (function(){
+  function viaJsonp(failToBeacon){
     var s=document.createElement('script');
     var fn='__cb_'+Date.now()+'_'+Math.floor(Math.random()*9999);
-    var t=setTimeout(function(){ try{delete window[fn];s.remove();}catch(e){} },45000);
+    var t=setTimeout(function(){
+      try{delete window[fn];s.remove();}catch(e){}
+      if(failToBeacon) beaconThenFinish();
+      else finish({ok:false,error:'Hết chờ JSONP'});
+    }, opts.timeoutMs||45000);
     window[fn]=function(d){
       clearTimeout(t);
       try{delete window[fn];s.remove();}catch(e){}
       if(d) finish(d);
+      else if(failToBeacon) beaconThenFinish();
     };
-    s.onerror=function(){ clearTimeout(t); try{delete window[fn];s.remove();}catch(e){} };
+    s.onerror=function(){
+      clearTimeout(t);
+      try{delete window[fn];s.remove();}catch(e){}
+      if(failToBeacon) beaconThenFinish();
+      else finish({ok:false,error:'JSONP lỗi\n'+WEB_APP_URL});
+    };
     s.referrerPolicy='no-referrer';
     s.src=url+(url.indexOf('?')>-1?'&':'?')+'callback='+encodeURIComponent(fn);
     document.body.appendChild(s);
-  })();
+  }
+  function beaconThenFinish(){
+    // chỉ khi fetch+JSONP fail — gửi 1 beacon rồi mở PDF (server vẫn chạy)
+    try{ new Image().src=url+(url.indexOf('?')>-1?'&':'?')+'_beacon=1'; }catch(e){}
+    finish({ok:true,pdfUrl:PDF_URL_BASE,sync:{ok:true,mode:'beacon'},_note:'Đã gửi sync (beacon), đang mở PDF'});
+  }
 
-  fetch(url,{method:'GET',redirect:'follow',credentials:'omit',cache:'no-store',referrerPolicy:'no-referrer'})
+  var ctrl=typeof AbortController!=='undefined'?new AbortController():null;
+  var abortT=setTimeout(function(){ try{if(ctrl)ctrl.abort();}catch(e){} }, opts.timeoutMs||45000);
+  fetch(url,{method:'GET',redirect:'follow',credentials:'omit',cache:'no-store',referrerPolicy:'no-referrer',signal:ctrl?ctrl.signal:undefined})
     .then(function(res){ if(!res.ok) throw new Error('HTTP '+res.status); return res.text(); })
-    .then(function(txt){ finish(parsePayload(txt)); })
-    .catch(function(){});
-
-  setTimeout(function(){
-    if(settled) return;
-    if(opts.allowBeaconSuccess){
-      finish({ok:true,pdfUrl:PDF_URL_BASE,sync:{ok:true,mode:'beacon-timeout'},_note:'Không đọc JSON — đã gửi lệnh sync, mở PDF'});
-    } else {
-      finish({ok:false,error:'Không kết nối Web App (fetch+JSONP fail)\n'+WEB_APP_URL});
-    }
-  }, opts.timeoutMs||12000);
+    .then(function(txt){ clearTimeout(abortT); finish(parsePayload(txt)); })
+    .catch(function(){
+      clearTimeout(abortT);
+      // fetch fail (CORS/github.io) → thử JSONP 1 lần
+      viaJsonp(!!opts.allowBeaconSuccess);
+    });
 }
 
 btnClear.onclick=function(){input.value='';input.focus();setStatus('','');};
@@ -117,15 +126,15 @@ function openPdf(p){
 function doPrint(){
   var ma=input.value.trim();
   if(!ma){setStatus('Vui lòng nhập Mã Phiếu','err');input.focus();return;}
-  setStatus('đang kiểm tra phiếu...','loading');
+  setStatus('đang sync '+ma+'...','loading');
   btnPrint.disabled=true;
   var url=WEB_APP_URL+'?action=syncAndPrint&maPhieu='+encodeURIComponent(ma)+'&t='+Date.now();
   callWebApp(url,function(r){
     btnPrint.disabled=false;
     if(!r||r.ok===false){
-      var msg='Lỗi sync: '+(r&&r.error||'Hết chờ')+'\n→ Deploy Web App: Anyone + New version\n'+WEB_APP_URL;
+      var msg='Lỗi: '+(r&&r.error||'Hết chờ')+'\nDeploy New version (Anyone) rồi thử lại';
       setStatus(msg,'err');
-      setTimeout(function(){ openPdf(PDF_URL_BASE); },1200);
+      setTimeout(function(){ openPdf(PDF_URL_BASE); },1500);
       return;
     }
     var mode=r.sync&&r.sync.mode||'';
@@ -134,19 +143,18 @@ function doPrint(){
     var ten=r.sync&&(r.sync.tenMay||(r.sync.one&&r.sync.one.tenMay))||'';
     if(r._note) setStatus(r._note,'loading');
     else if(r.sync&&r.sync.ok===false) setStatus('sync FAIL: '+(syncErr||'(không rõ)')+' — vẫn in','err');
-    else if(skipped||mode==='skip'||mode==='one-skip') setStatus('Không đổi'+(ten?' · '+ten:'')+' — mở PDF','ok');
-    else setStatus('OK ('+mode+')'+(ten?' · '+ten:'')+' — mở PDF','ok');
-    setTimeout(function(){ openPdf(r.pdfUrl||PDF_URL_BASE); },300);
-  },{allowBeaconSuccess:true,timeoutMs:60000});
+    else if(skipped||mode==='skip'||mode==='one-skip') setStatus('OK không đổi'+(ten?' · '+ten:'')+' — mở PDF','ok');
+    else setStatus('OK sync'+(ten?' · '+ten:'')+' — mở PDF','ok');
+    setTimeout(function(){ openPdf(r.pdfUrl||PDF_URL_BASE); },400);
+  },{allowBeaconSuccess:true,timeoutMs:90000});
 }
 btnPrint.onclick=doPrint;
 
-// Ping khi mở trang — biết ngay Web App có nối được không
 setStatus('đang kiểm tra Web App...','loading');
 callWebApp(WEB_APP_URL+'?action=ping&t='+Date.now(),function(r){
   if(r&&r.ok) setStatus('Web App OK'+(r.cols?' · '+r.cols+' cột':''),'ok');
-  else setStatus('Web App không nối được:\n'+(r&&r.error||'?'),'err');
-},{allowBeaconSuccess:false,timeoutMs:10000});
+  else setStatus('Web App lỗi:\n'+(r&&r.error||'?'),'err');
+},{allowBeaconSuccess:false,timeoutMs:15000});
 </script>
 </body>
 </html>
