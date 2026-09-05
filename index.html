@@ -130,12 +130,14 @@ function doPrint(){
     }
     var mode=r.sync&&r.sync.mode||'';
     var skipped=!!(r.sync&&r.sync.skipped);
+    var syncErr=(r.sync&&(r.sync.error||(r.sync.one&&r.sync.one.error)||(r.sync.day&&r.sync.day.error)))||'';
+    var ten=r.sync&&(r.sync.tenMay||(r.sync.one&&r.sync.one.tenMay))||'';
     if(r._note) setStatus(r._note,'loading');
-    else if(r.sync&&r.sync.ok===false) setStatus('sync FAIL: '+(r.sync.error||'')+' — vẫn in','err');
-    else if(skipped||mode==='skip'||mode==='one-skip') setStatus('Không đổi — bỏ sync, mở PDF','ok');
-    else setStatus('OK ('+mode+') — mở PDF','ok');
+    else if(r.sync&&r.sync.ok===false) setStatus('sync FAIL: '+(syncErr||'(không rõ)')+' — vẫn in','err');
+    else if(skipped||mode==='skip'||mode==='one-skip') setStatus('Không đổi'+(ten?' · '+ten:'')+' — mở PDF','ok');
+    else setStatus('OK ('+mode+')'+(ten?' · '+ten:'')+' — mở PDF','ok');
     setTimeout(function(){ openPdf(r.pdfUrl||PDF_URL_BASE); },300);
-  },{allowBeaconSuccess:true,timeoutMs:30000});
+  },{allowBeaconSuccess:true,timeoutMs:60000});
 }
 btnPrint.onclick=doPrint;
 
