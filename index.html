@@ -34,10 +34,7 @@
 <body>
 <div class="wrap">
   <div class="card">
-    <div class="head">
-      <div class="icon">🖨️</div>
-      <div><h1>IN PHIẾU THU CŨ</h1></div>
-    </div>
+    <div class="head"><div class="icon">🖨️</div><div><h1>IN PHIẾU THU CŨ</h1></div></div>
     <div class="body">
       <label for="maPhieuInput">Mã Phiếu <span style="color:#d93025">*</span></label>
       <div class="input-row">
@@ -45,17 +42,12 @@
         <button id="btnClear" class="btn" style="width:auto;flex:0 0 auto;padding:10px 14px" title="Xóa">✕</button>
       </div>
       <div id="suggestBox" class="suggest"></div>
-      <div class="actions">
-        <button id="btnPrint" class="btn btn-primary">🖨️ In phiếu</button>
-      </div>
+      <div class="actions"><button id="btnPrint" class="btn btn-primary">🖨️ In phiếu</button></div>
       <div id="statusBox" class="status"></div>
     </div>
   </div>
 </div>
-
-<!-- Iframe ẩn để tải PDF - sẽ tự bật hộp thoại in của trình duyệt -->
 <iframe id="printFrame" style="display:none;width:0;height:0;border:0"></iframe>
-
 <script>
 const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbz9dLjloP-W6_BF-f_6nq2aROliCoxCe326PVidEZ7qm2aSvo7Et73YLISWT1lsXjkB/exec';
 const input = document.getElementById('maPhieuInput');
@@ -64,14 +56,12 @@ const btnClear = document.getElementById('btnClear');
 const statusBox = document.getElementById('statusBox');
 const suggestBox = document.getElementById('suggestBox');
 const printFrame = document.getElementById('printFrame');
-
 (function(){
   const p = new URLSearchParams(location.search);
   const m = p.get('maPhieu') || p.get('ma_phieu') || p.get('goPrint') || p.get('MaPhieu') || p.get('code') || '';
   if(m) input.value = m;
 })();
 setTimeout(function(){ input.focus(); if(input.value) input.select(); }, 120);
-
 function setStatus(msg, kind){
   if(!msg){ statusBox.style.display='none'; statusBox.textContent=''; return; }
   statusBox.textContent = msg;
@@ -101,24 +91,10 @@ function loadSuggest(){
 loadSuggest();
 btnClear.onclick = function(){ input.value=''; input.focus(); setStatus('',''); };
 input.addEventListener('keydown', function(e){ if(e.key==='Enter'){ e.preventDefault(); doPrint(); } });
-
-// Gọi OAuth token để fetch PDF trực tiếp từ Google (không bị chặn iframe) - fallback dùng window.open nếu không lấy được token
 function openPdfPrint(pdfUrl){
-  // Cách 1: thử mở PDF trong tab mới - trình duyệt sẽ hiện preview để in luôn, không qua Sheet
-  // Dùng iframe trước để không bị popup blocker vì đã trong handler click
-  try{
-    printFrame.src = pdfUrl;
-    // Sau 1s cũng mở tab mới để chắc chắn hiện hộp thoại nếu iframe bị chặn
-    setTimeout(function(){ window.open(pdfUrl, '_blank'); }, 800);
-  }catch(e){
-    window.open(pdfUrl, '_blank');
-  }
-  // Sau khi iframe load PDF, tự gọi print của iframe (nhiều trình duyệt hỗ trợ)
-  printFrame.onload = function(){
-    try{ printFrame.contentWindow.print(); }catch(e){}
-  };
+  try{ printFrame.src = pdfUrl; setTimeout(function(){ window.open(pdfUrl, '_blank'); }, 800); }catch(e){ window.open(pdfUrl, '_blank'); }
+  printFrame.onload = function(){ try{ printFrame.contentWindow.print(); }catch(e){} };
 }
-
 function doPrint(){
   const ma = input.value.trim();
   if(!ma){ setStatus('Vui lòng nhập Mã Phiếu', 'err'); input.focus(); return; }
@@ -129,14 +105,8 @@ function doPrint(){
     btnPrint.disabled = false;
     if(!r || !r.ok){ setStatus('Lỗi: ' + (r&&r.error||'Không điền được B3:C3'), 'err'); return; }
     setStatus('đang in', 'ok');
-    // Export thẳng PDF của In phiếu thu máy (gid=614955341) A4 vừa trang - khỏi chuyển hướng qua Sheet
-    if(r.pdfUrl){
-      openPdfPrint(r.pdfUrl);
-    } else {
-      // fallback
-      const pdf = 'https://docs.google.com/spreadsheets/d/1nvU46bxWHOo9itAQc4I2bun3dZ6VGRAU_8BNLVUB0Eg/export?format=pdf&gid=614955341&portrait=true&size=A4&fitw=true&sheetnames=false&printtitle=false&pagenumbers=false&gridlines=false&fzr=false';
-      openPdfPrint(pdf);
-    }
+    if(r.pdfUrl) openPdfPrint(r.pdfUrl);
+    else window.open(r.sheetUrl, '_blank');
   });
 }
 btnPrint.onclick = doPrint;
