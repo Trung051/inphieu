@@ -126,7 +126,7 @@ function openPdf(p){
 function doPrint(){
   var ma=input.value.trim();
   if(!ma){setStatus('Vui lòng nhập Mã Phiếu','err');input.focus();return;}
-  setStatus('đang sync '+ma+'...','loading');
+  setStatus('đang sync hôm nay + ghi B3...','loading');
   btnPrint.disabled=true;
   var url=WEB_APP_URL+'?action=syncAndPrint&maPhieu='+encodeURIComponent(ma)+'&t='+Date.now();
   callWebApp(url,function(r){
@@ -137,14 +137,12 @@ function doPrint(){
       setTimeout(function(){ openPdf(PDF_URL_BASE); },1500);
       return;
     }
-    var mode=r.sync&&r.sync.mode||'';
-    var skipped=!!(r.sync&&r.sync.skipped);
-    var syncErr=(r.sync&&(r.sync.error||(r.sync.one&&r.sync.one.error)||(r.sync.day&&r.sync.day.error)))||'';
-    var ten=r.sync&&(r.sync.tenMay||(r.sync.one&&r.sync.one.tenMay))||'';
+    var s=r.sync||{};
+    var n=s.total!=null?s.total:null;
     if(r._note) setStatus(r._note,'loading');
-    else if(r.sync&&r.sync.ok===false) setStatus('sync FAIL: '+(syncErr||'(không rõ)')+' — vẫn in','err');
-    else if(skipped||mode==='skip'||mode==='one-skip') setStatus('OK không đổi'+(ten?' · '+ten:'')+' — mở PDF','ok');
-    else setStatus('OK sync'+(ten?' · '+ten:'')+' — mở PDF','ok');
+    else if(s.ok===false) setStatus('sync ngày lỗi: '+(s.error||'?')+' — vẫn ghi B3 + in','err');
+    else if(s.skipped) setStatus('B3='+ma+' · hôm nay không mới — mở PDF','ok');
+    else setStatus('B3='+ma+(n!=null?' · sync '+n+' phiếu':'')+' — mở PDF','ok');
     setTimeout(function(){ openPdf(r.pdfUrl||PDF_URL_BASE); },400);
   },{allowBeaconSuccess:true,timeoutMs:90000});
 }
