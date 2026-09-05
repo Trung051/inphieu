@@ -117,7 +117,7 @@ function openPdf(p){
 function doPrint(){
   var ma=input.value.trim();
   if(!ma){setStatus('Vui lòng nhập Mã Phiếu','err');input.focus();return;}
-  setStatus('đang sync + chuẩn bị PDF...','loading');
+  setStatus('đang sync từ Lark (có thể 15–60s)...','loading');
   btnPrint.disabled=true;
   var url=WEB_APP_URL+'?action=syncAndPrint&maPhieu='+encodeURIComponent(ma)+'&t='+Date.now();
   callWebApp(url,function(r){
@@ -129,10 +129,10 @@ function doPrint(){
       return;
     }
     if(r._note) setStatus(r._note,'loading');
-    else if(r.sync&&r.sync.ok===false) setStatus('sync: '+r.sync.error+' — vẫn in','err');
-    else setStatus('OK'+(r.sync&&r.sync.mode?' ('+r.sync.mode+')':'')+' — đang mở PDF','ok');
-    setTimeout(function(){ openPdf(r.pdfUrl||PDF_URL_BASE); },400);
-  },{allowBeaconSuccess:true,timeoutMs:16000});
+    else if(r.sync&&r.sync.ok===false) setStatus('sync FAIL: '+(r.sync.error||JSON.stringify(r.sync))+' — vẫn in (data cũ)','err');
+    else setStatus('OK sync='+(r.sync&&r.sync.mode||'?')+(r.sync&&r.sync.record_id?' · '+r.sync.record_id:'')+' — đang mở PDF','ok');
+    setTimeout(function(){ openPdf(r.pdfUrl||PDF_URL_BASE); }, r.sync&&r.sync.ok===false?800:500);
+  },{allowBeaconSuccess:true,timeoutMs:90000});
 }
 btnPrint.onclick=doPrint;
 
