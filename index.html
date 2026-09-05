@@ -34,7 +34,10 @@
 <body>
 <div class="wrap">
   <div class="card">
-    <div class="head"><div class="icon">🖨️</div><div><h1>IN PHIẾU THU CŨ</h1></div></div>
+    <div class="head">
+      <div class="icon">🖨️</div>
+      <div><h1>IN PHIẾU THU CŨ</h1></div>
+    </div>
     <div class="body">
       <label for="maPhieuInput">Mã Phiếu <span style="color:#d93025">*</span></label>
       <div class="input-row">
@@ -42,12 +45,14 @@
         <button id="btnClear" class="btn" style="width:auto;flex:0 0 auto;padding:10px 14px" title="Xóa">✕</button>
       </div>
       <div id="suggestBox" class="suggest"></div>
-      <div class="actions"><button id="btnPrint" class="btn btn-primary">🖨️ In phiếu</button></div>
+      <div class="actions">
+        <button id="btnPrint" class="btn btn-primary">🖨️ In phiếu</button>
+      </div>
       <div id="statusBox" class="status"></div>
     </div>
   </div>
 </div>
-<iframe id="printFrame" style="display:none;width:0;height:0;border:0"></iframe>
+
 <script>
 const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbz9dLjloP-W6_BF-f_6nq2aROliCoxCe326PVidEZ7qm2aSvo7Et73YLISWT1lsXjkB/exec';
 const input = document.getElementById('maPhieuInput');
@@ -55,30 +60,52 @@ const btnPrint = document.getElementById('btnPrint');
 const btnClear = document.getElementById('btnClear');
 const statusBox = document.getElementById('statusBox');
 const suggestBox = document.getElementById('suggestBox');
-const printFrame = document.getElementById('printFrame');
+
 (function(){
   const p = new URLSearchParams(location.search);
   const m = p.get('maPhieu') || p.get('ma_phieu') || p.get('goPrint') || p.get('MaPhieu') || p.get('code') || '';
   if(m) input.value = m;
 })();
 setTimeout(function(){ input.focus(); if(input.value) input.select(); }, 120);
+
 function setStatus(msg, kind){
   if(!msg){ statusBox.style.display='none'; statusBox.textContent=''; return; }
   statusBox.textContent = msg;
   statusBox.className = 'status ' + (kind||'');
   statusBox.style.display = 'block';
 }
+// FIX: local chạy python -m http.server thì JSONP ok, nhưng Github -> Apps Script phải dùng JSONP với ?callback=
+// Lỗi "Không kết nối được" là do Apps Script chưa deploy "Bất kỳ ai (Anyone)" -> trả về trang đăng nhập, script onerror.
+// Dùng fetch qua Apps Script JSON API với no-cors không đọc được callback -> phải JSONP.
 function jsonp(url, cb){
   const s = document.createElement('script');
   const fn = '__cb_' + Date.now() + '_' + Math.floor(Math.random()*9999);
-  window[fn] = function(d){ delete window[fn]; document.body.removeChild(s); cb(d); };
-  s.onerror = function(){ delete window[fn]; try{document.body.removeChild(s);}catch(e){} cb({ok:false,error:'Không kết nối được Apps Script. Kiểm tra deploy Ai có quyền = Bất kỳ ai'}); };
+  let done = false;
+  const timeout = setTimeout(function(){
+    if(done) return; done = true;
+    try{ delete window[fn]; document.body.removeChild(s);}catch(e){}
+    cb({ok:false, error:'Hết thời gian chờ. Kiểm tra Web App có deploy "Bất kỳ ai" chưa: ' + WEB_APP_URL});
+  }, 15000);
+  window[fn] = function(d){ if(done) return; done = true; clearTimeout(timeout); try{ delete window[fn]; document.body.removeChild(s);}catch(e){} cb(d); };
+  s.onerror = function(){
+    if(done) return; done = true; clearTimeout(timeout);
+    try{ delete window[fn]; document.body.removeChild(s);}catch(e){}
+    // Thử fetch thường để lấy lỗi chi tiết hơn
+    fetch(url).then(function(r){return r.text();}).then(function(t){
+      cb({ok:false, error:'Không tải được JSONP. Response: ' + t.slice(0,300) + ' — Kiểm tra deploy Ai có quyền = Bất kỳ ai'});
+    }).catch(function(){
+      cb({ok:false, error:'Không kết nối được Apps Script. Kiểm tra deploy Ai có quyền = Bất kỳ ai. URL: ' + WEB_APP_URL});
+    });
+  };
   s.src = url + (url.indexOf('?')>-1?'&':'?') + 'callback=' + fn;
   document.body.appendChild(s);
 }
 function loadSuggest(){
   jsonp(WEB_APP_URL + '?action=list', function(r){
-    if(!r || !r.ok || !r.list || !r.list.length) return;
+    if(!r || !r.ok || !r.list || !r.list.length){
+      // không báo lỗi ở đây, chỉ gợi ý thôi
+      return;
+    }
     suggestBox.innerHTML='';
     r.list.slice(0,12).forEach(function(ma){
       const b=document.createElement('button');
@@ -91,10 +118,7 @@ function loadSuggest(){
 loadSuggest();
 btnClear.onclick = function(){ input.value=''; input.focus(); setStatus('',''); };
 input.addEventListener('keydown', function(e){ if(e.key==='Enter'){ e.preventDefault(); doPrint(); } });
-function openPdfPrint(pdfUrl){
-  try{ printFrame.src = pdfUrl; setTimeout(function(){ window.open(pdfUrl, '_blank'); }, 800); }catch(e){ window.open(pdfUrl, '_blank'); }
-  printFrame.onload = function(){ try{ printFrame.contentWindow.print(); }catch(e){} };
-}
+
 function doPrint(){
   const ma = input.value.trim();
   if(!ma){ setStatus('Vui lòng nhập Mã Phiếu', 'err'); input.focus(); return; }
@@ -103,10 +127,15 @@ function doPrint(){
   const url = WEB_APP_URL + '?action=setPrint&maPhieu=' + encodeURIComponent(ma);
   jsonp(url, function(r){
     btnPrint.disabled = false;
-    if(!r || !r.ok){ setStatus('Lỗi: ' + (r&&r.error||'Không điền được B3:C3'), 'err'); return; }
+    if(!r || !r.ok){ setStatus('Lỗi: ' + (r&&r.error||'Không điền được B3:C3 — thử mở ' + WEB_APP_URL + '?action=ping xem có đăng nhập không'), 'err'); return; }
     setStatus('đang in', 'ok');
-    if(r.pdfUrl) openPdfPrint(r.pdfUrl);
-    else window.open(r.sheetUrl, '_blank');
+    // Vào thẳng chế độ in HTML A4 (đã điền B3:C3 trên In phiếu thu máy) — không qua Sheet
+    const printUrl = r.printUrl || (WEB_APP_URL + '?page=print&maPhieu=' + encodeURIComponent(ma));
+    // Mở trong iframe ẩn cũng được nhưng popup blocker sẽ chặn nếu không phải click trực tiếp -> dùng window.open ngay sau jsonp callback vẫn ok vì cùng tick user
+    const win = window.open(printUrl, '_blank');
+    if(!win){
+      setStatus('Popup bị chặn! Hãy cho phép popup cho ' + location.host + ' rồi bấm In lại', 'err');
+    }
   });
 }
 btnPrint.onclick = doPrint;
