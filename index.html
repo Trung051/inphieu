@@ -3,50 +3,51 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>In Phiếu Thu Cũ - Nhập Mã Phiếu</title>
+<title>In Phiếu Thu Cũ</title>
 <style>
-  :root{--blue:#1a73e8;--bg:#f8f9fa;--card:#fff;--border:#dadce0;--text:#202124}
+  :root{--blue:#1a73e8;--bg:#f4f6f8;--card:#fff;--border:#e0e3e7;--text:#1f2937;--muted:#6b7280}
   *{box-sizing:border-box;margin:0;padding:0}
-  body{font-family:'Segoe UI',Roboto,Arial,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
-  .wrap{width:100%;max-width:480px}
-  .card{background:var(--card);border:1px solid var(--border);border-radius:16px;box-shadow:0 4px 24px rgba(0,0,0,.08);overflow:hidden}
-  .head{background:var(--blue);color:#fff;padding:18px 20px;display:flex;align-items:center;gap:12px}
-  .head .icon{width:40px;height:40px;border-radius:999px;background:rgba(255,255,255,.22);display:flex;align-items:center;justify-content:center;font-size:22px}
-  .head h1{font-size:15px}
-  .body{padding:20px}
-  label{font-size:13px;font-weight:600;display:block;margin-bottom:6px}
-  .input-row{display:flex;gap:8px}
-  input[type=text]{flex:1;padding:12px 14px;border:1.5px solid var(--border);border-radius:10px;font-size:16px;outline:none}
-  input[type=text]:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(26,115,232,.15)}
-  .suggest{margin-top:8px;display:flex;flex-wrap:wrap;gap:6px;min-height:22px}
-  .chip{font-size:12px;padding:6px 10px;border-radius:999px;border:1px solid var(--border);background:#fff;cursor:pointer}
-  .chip:hover{border-color:var(--blue);color:var(--blue);background:#e8f0fe}
-  .actions{margin-top:16px}
-  .btn{width:100%;padding:12px 16px;border-radius:10px;border:1px solid var(--border);font-size:14px;font-weight:700;cursor:pointer;background:#fff}
-  .btn-primary{background:var(--blue);color:#fff;border-color:var(--blue)}
+  body{font-family:'Segoe UI',Roboto,Arial,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;display:flex;align-items:center;justify-content:center;padding:16px}
+  .wrap{width:100%;max-width:360px}
+  .card{background:var(--card);border:1px solid var(--border);border-radius:10px;box-shadow:0 2px 12px rgba(0,0,0,.06);overflow:hidden}
+  .head{background:var(--blue);color:#fff;padding:10px 14px;text-align:center}
+  .head h1{font-size:13px;font-weight:700;letter-spacing:.3px}
+  .body{padding:14px}
+  label{font-size:11px;font-weight:600;color:var(--text);display:block;margin-bottom:5px}
+  label span{color:#d93025}
+  .input-row{display:flex;gap:6px}
+  input[type=text]{flex:1;padding:7px 10px;border:1.2px solid var(--border);border-radius:7px;font-size:12.5px;outline:none;background:#fff}
+  input[type=text]:focus{border-color:var(--blue);box-shadow:0 0 0 2px rgba(26,115,232,.12)}
+  input::placeholder{color:#9ca3af;font-size:12px}
+  .btn-clear{flex:0 0 30px;width:30px;height:32px;padding:0;border:1.2px solid var(--border);border-radius:7px;background:#fff;font-size:12px;cursor:pointer;color:var(--muted)}
+  .btn-clear:hover{border-color:#9ca3af;color:var(--text)}
+  .suggest{margin-top:7px;display:flex;flex-wrap:wrap;gap:5px;min-height:14px}
+  .chip{font-size:11px;padding:3px 8px;border-radius:999px;border:1px solid var(--border);background:#fff;cursor:pointer;color:#374151;line-height:1.4}
+  .chip:hover{border-color:var(--blue);color:var(--blue);background:#eef4ff}
+  .actions{margin-top:12px}
+  .btn{width:100%;padding:8px 12px;border-radius:7px;border:1px solid var(--border);font-size:12.5px;font-weight:700;cursor:pointer;background:#fff}
+  .btn-primary{background:var(--blue);color:#fff;border-color:var(--blue);font-size:12.5px}
+  .btn-primary:hover{background:#1557b0}
   .btn:disabled{opacity:.5;cursor:not-allowed}
-  .status{margin-top:12px;font-size:13px;padding:10px 12px;border-radius:10px;display:none}
-  .status.ok{background:#e6f4ea;color:#0d652d;border:1px solid #a8dab5;display:block}
-  .status.err{background:#fce8e6;color:#b3261e;border:1px solid #f2b8b5;display:block}
-  .status.loading{background:#e8f0fe;color:#174ea6;border:1px solid #aecbfa;display:block}
+  .status{margin-top:10px;font-size:11.5px;padding:7px 10px;border-radius:7px;display:none;line-height:1.4}
+  .status.ok{background:#e6f4ea;color:#137333;border:1px solid #b6dfc2;display:block}
+  .status.err{background:#fce8e6;color:#a50e0e;border:1px solid #f5b5b2;display:block}
+  .status.loading{background:#e8f0fe;color:#174ea6;border:1px solid #c2d8ff;display:block}
 </style>
 </head>
 <body>
 <div class="wrap">
   <div class="card">
-    <div class="head">
-      <div class="icon">🖨️</div>
-      <div><h1>IN PHIẾU THU CŨ</h1></div>
-    </div>
+    <div class="head"><h1>IN PHIẾU THU CŨ</h1></div>
     <div class="body">
-      <label for="maPhieuInput">Mã Phiếu <span style="color:#d93025">*</span></label>
+      <label for="maPhieuInput">Mã Phiếu <span>*</span></label>
       <div class="input-row">
         <input id="maPhieuInput" type="text" placeholder="VD: PNM0039" autocomplete="off">
-        <button id="btnClear" class="btn" style="width:auto;flex:0 0 auto;padding:10px 14px" title="Xóa">✕</button>
+        <button id="btnClear" class="btn-clear" title="Xóa">✕</button>
       </div>
       <div id="suggestBox" class="suggest"></div>
       <div class="actions">
-        <button id="btnPrint" class="btn btn-primary">🖨️ In phiếu</button>
+        <button id="btnPrint" class="btn btn-primary">In phiếu</button>
       </div>
       <div id="statusBox" class="status"></div>
     </div>
@@ -54,14 +55,8 @@
 </div>
 
 <script>
-// FIX: Github Pages https gọi script.google.com bị redirect sang script.googleusercontent.com
-// -> JSONP <script> bị chặn onerror nhưng fetch lại đọc được {"ok":true,"maPhieu":"PNM0039"...}
-// -> đổi sang beacon bằng Image/iframe (không bị CORS) để đẩy Mã vào In phiếu thu máy!B3:C3 rồi mở PDF export thẳng
 const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbz9dLjloP-W6_BF-f_6nq2aROliCoxCe326PVidEZ7qm2aSvo7Et73YLISWT1lsXjkB/exec';
-const SHEET_ID = '1nvU46bxWHOo9itAQc4I2bun3dZ6VGRAU_8BNLVUB0Eg';
-const PRINT_GID = '614955341';
-const PDF_URL_TMPL = 'https://docs.google.com/spreadsheets/d/'+SHEET_ID+'/export?format=pdf&gid='+PRINT_GID+'&portrait=true&size=A4&fitw=true&sheetnames=false&printtitle=false&pagenumbers=false&gridlines=false&fzr=false';
-
+const PDF_URL_BASE = 'https://docs.google.com/spreadsheets/d/1nvU46bxWHOo9itAQc4I2bun3dZ6VGRAU_8BNLVUB0Eg/export?format=pdf&gid=614955341&portrait=true&size=A4&fitw=true&sheetnames=false&printtitle=false&pagenumbers=false&gridlines=false&fzr=false';
 const input = document.getElementById('maPhieuInput');
 const btnPrint = document.getElementById('btnPrint');
 const btnClear = document.getElementById('btnClear');
@@ -73,7 +68,7 @@ const suggestBox = document.getElementById('suggestBox');
   const m = p.get('maPhieu') || p.get('ma_phieu') || p.get('goPrint') || p.get('MaPhieu') || p.get('code') || '';
   if(m) input.value = m;
 })();
-setTimeout(function(){ input.focus(); if(input.value) input.select(); }, 120);
+setTimeout(function(){ input.focus(); if(input.value) input.select(); }, 100);
 
 function setStatus(msg, kind){
   if(!msg){ statusBox.style.display='none'; statusBox.textContent=''; return; }
@@ -85,9 +80,9 @@ function jsonp(url, cb){
   const s = document.createElement('script');
   const fn = '__cb_' + Date.now() + '_' + Math.floor(Math.random()*9999);
   let done=false;
-  const t=setTimeout(function(){ if(done) return; done=true; try{delete window[fn];s.remove();}catch(e){} cb({ok:false}); },12000);
+  const t=setTimeout(function(){ if(done) return; done=true; try{delete window[fn];s.remove();}catch(e){} cb({ok:false,error:'Hết chờ'}); },12000);
   window[fn]=function(d){ if(done) return; done=true; clearTimeout(t); try{delete window[fn];s.remove();}catch(e){} cb(d); };
-  s.onerror=function(){ if(done) return; done=true; clearTimeout(t); try{delete window[fn];s.remove();}catch(e){} cb({ok:false}); };
+  s.onerror=function(){ if(done) return; done=true; clearTimeout(t); try{delete window[fn];s.remove();}catch(e){} cb({ok:false,error:'Không kết nối được Apps Script'}); };
   s.src=url+(url.indexOf('?')>-1?'&':'?')+'callback='+fn;
   document.body.appendChild(s);
 }
@@ -95,7 +90,7 @@ function loadSuggest(){
   jsonp(WEB_APP_URL + '?action=list', function(r){
     if(!r || !r.ok || !r.list || !r.list.length) return;
     suggestBox.innerHTML='';
-    r.list.slice(0,12).forEach(function(ma){
+    r.list.slice(0,10).forEach(function(ma){
       const b=document.createElement('button');
       b.type='button'; b.className='chip'; b.textContent=ma;
       b.onclick=function(){ input.value=ma; setStatus('Đã chọn ' + ma,'ok'); };
@@ -112,30 +107,28 @@ function doPrint(){
   if(!ma){ setStatus('Vui lòng nhập Mã Phiếu', 'err'); input.focus(); return; }
   setStatus('đang in', 'loading');
   btnPrint.disabled = true;
-
-  const beaconUrl = WEB_APP_URL + '?action=setPrint&maPhieu=' + encodeURIComponent(ma) + '&t=' + Date.now();
-  let opened = false;
-  function openPdf(){
-    if(opened) return; opened = true;
-    btnPrint.disabled = false;
-    setStatus('đang in', 'ok');
-    // Export thẳng PDF của In phiếu thu máy (gid=614955341) - đã điền B3:C3, khỏi chuyển hướng qua Sheet
-    const pdf = PDF_URL_TMPL;
-    // Dùng thẻ a để tải + window.open để preview in
-    const a=document.createElement('a'); a.href=pdf; a.target='_blank'; a.rel='noopener'; document.body.appendChild(a); a.click();
-    setTimeout(function(){ a.remove(); window.open(pdf,'_blank'); }, 500);
+  const url = WEB_APP_URL + '?action=setPrint&maPhieu=' + encodeURIComponent(ma) + '&t=' + Date.now();
+  // Dùng Image beacon để không bị chặn CORS/redirect như JSONP cũ -> Github -> Apps Script luôn đẩy B3:C3 thành công
+  // Dù JSONP lỗi vẫn đẩy được vì Image GET đã tới server
+  let opened=false;
+  function openPdf(pdfUrl){
+    if(opened) return; opened=true;
+    btnPrint.disabled=false;
+    setStatus('đang in','ok');
+    const pdf = pdfUrl || PDF_URL_BASE;
+    const a=document.createElement('a'); a.href=pdf; a.target='_blank'; document.body.appendChild(a); a.click();
+    setTimeout(function(){ a.remove(); window.open(pdf,'_blank'); }, 400);
   }
-
-  // Beacon bằng Image - không bị CORS, luôn kích được Apps Script dù ở Github Pages
-  const img = new Image();
-  let timer = setTimeout(openPdf, 1800);
-  img.onload = img.onerror = function(){ clearTimeout(timer); setTimeout(openPdf, 700); };
-  img.src = beaconUrl;
-
-  // Backup: iframe ẩn cũng kích được nếu Image bị cache chặn
-  const ifr = document.createElement('iframe');
-  ifr.style.display='none'; ifr.src = beaconUrl; document.body.appendChild(ifr);
-  setTimeout(function(){ try{ifr.remove();}catch(e){} }, 5000);
+  const beacon = new Image();
+  let timer = setTimeout(function(){ openPdf(PDF_URL_BASE); }, 1800);
+  beacon.onload = beacon.onerror = function(){ clearTimeout(timer); setTimeout(function(){ openPdf(PDF_URL_BASE); }, 600); };
+  beacon.src = url;
+  // Song song thử JSONP để lấy pdfUrl chính xác (có gid mới nếu đổi sheet)
+  jsonp(url, function(r){
+    clearTimeout(timer);
+    if(r && r.ok && r.pdfUrl) openPdf(r.pdfUrl);
+    // nếu JSONP lỗi nhưng beacon đã gửi thì vẫn openPdf ở trên
+  });
 }
 btnPrint.onclick = doPrint;
 </script>
