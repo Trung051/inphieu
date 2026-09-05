@@ -54,7 +54,14 @@
 </div>
 
 <script>
+// FIX: Github Pages https gọi script.google.com bị redirect sang script.googleusercontent.com
+// -> JSONP <script> bị chặn onerror nhưng fetch lại đọc được {"ok":true,"maPhieu":"PNM0039"...}
+// -> đổi sang beacon bằng Image/iframe (không bị CORS) để đẩy Mã vào In phiếu thu máy!B3:C3 rồi mở PDF export thẳng
 const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbz9dLjloP-W6_BF-f_6nq2aROliCoxCe326PVidEZ7qm2aSvo7Et73YLISWT1lsXjkB/exec';
+const SHEET_ID = '1nvU46bxWHOo9itAQc4I2bun3dZ6VGRAU_8BNLVUB0Eg';
+const PRINT_GID = '614955341';
+const PDF_URL_TMPL = 'https://docs.google.com/spreadsheets/d/'+SHEET_ID+'/export?format=pdf&gid='+PRINT_GID+'&portrait=true&size=A4&fitw=true&sheetnames=false&printtitle=false&pagenumbers=false&gridlines=false&fzr=false';
+
 const input = document.getElementById('maPhieuInput');
 const btnPrint = document.getElementById('btnPrint');
 const btnClear = document.getElementById('btnClear');
@@ -78,9 +85,9 @@ function jsonp(url, cb){
   const s = document.createElement('script');
   const fn = '__cb_' + Date.now() + '_' + Math.floor(Math.random()*9999);
   let done=false;
-  const t=setTimeout(function(){ if(done) return; done=true; try{delete window[fn];s.remove();}catch(e){} cb({ok:false,error:'Hết chờ'}); },15000);
+  const t=setTimeout(function(){ if(done) return; done=true; try{delete window[fn];s.remove();}catch(e){} cb({ok:false}); },12000);
   window[fn]=function(d){ if(done) return; done=true; clearTimeout(t); try{delete window[fn];s.remove();}catch(e){} cb(d); };
-  s.onerror=function(){ if(done) return; done=true; clearTimeout(t); try{delete window[fn];s.remove();}catch(e){} cb({ok:false,error:'Không kết nối được Apps Script. Kiểm tra deploy Ai có quyền = Bất kỳ ai'}); };
+  s.onerror=function(){ if(done) return; done=true; clearTimeout(t); try{delete window[fn];s.remove();}catch(e){} cb({ok:false}); };
   s.src=url+(url.indexOf('?')>-1?'&':'?')+'callback='+fn;
   document.body.appendChild(s);
 }
@@ -105,23 +112,30 @@ function doPrint(){
   if(!ma){ setStatus('Vui lòng nhập Mã Phiếu', 'err'); input.focus(); return; }
   setStatus('đang in', 'loading');
   btnPrint.disabled = true;
-  const url = WEB_APP_URL + '?action=setPrint&maPhieu=' + encodeURIComponent(ma);
-  jsonp(url, function(r){
+
+  const beaconUrl = WEB_APP_URL + '?action=setPrint&maPhieu=' + encodeURIComponent(ma) + '&t=' + Date.now();
+  let opened = false;
+  function openPdf(){
+    if(opened) return; opened = true;
     btnPrint.disabled = false;
-    if(!r || !r.ok){ setStatus('Lỗi: ' + (r&&r.error||'Không điền được B3:C3'), 'err'); return; }
     setStatus('đang in', 'ok');
-    // Đẩy mã vào Sheet rồi export thẳng PDF của In phiếu thu máy (gid=614955341) để tải luôn - khỏi qua Sheet
-    const pdf = r.pdfUrl || ('https://docs.google.com/spreadsheets/d/1nvU46bxWHOo9itAQc4I2bun3dZ6VGRAU_8BNLVUB0Eg/export?format=pdf&gid=614955341&portrait=true&size=A4&fitw=true&sheetnames=false&printtitle=false&pagenumbers=false&gridlines=false&fzr=false');
-    // Tải PDF luôn: dùng link tải, trình duyệt sẽ download hoặc preview để in
-    // Thử trigger download bằng thẻ a ẩn
-    const a=document.createElement('a');
-    a.href=pdf;
-    a.download='Phieu_'+ma+'.pdf';
-    a.target='_blank';
-    document.body.appendChild(a);
-    a.click();
-    setTimeout(function(){a.remove(); window.open(pdf,'_blank');},400);
-  });
+    // Export thẳng PDF của In phiếu thu máy (gid=614955341) - đã điền B3:C3, khỏi chuyển hướng qua Sheet
+    const pdf = PDF_URL_TMPL;
+    // Dùng thẻ a để tải + window.open để preview in
+    const a=document.createElement('a'); a.href=pdf; a.target='_blank'; a.rel='noopener'; document.body.appendChild(a); a.click();
+    setTimeout(function(){ a.remove(); window.open(pdf,'_blank'); }, 500);
+  }
+
+  // Beacon bằng Image - không bị CORS, luôn kích được Apps Script dù ở Github Pages
+  const img = new Image();
+  let timer = setTimeout(openPdf, 1800);
+  img.onload = img.onerror = function(){ clearTimeout(timer); setTimeout(openPdf, 700); };
+  img.src = beaconUrl;
+
+  // Backup: iframe ẩn cũng kích được nếu Image bị cache chặn
+  const ifr = document.createElement('iframe');
+  ifr.style.display='none'; ifr.src = beaconUrl; document.body.appendChild(ifr);
+  setTimeout(function(){ try{ifr.remove();}catch(e){} }, 5000);
 }
 btnPrint.onclick = doPrint;
 </script>
