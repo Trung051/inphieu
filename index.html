@@ -54,25 +54,56 @@ const input=document.getElementById('maPhieuInput'),btnPrint=document.getElement
 (function(){ const p=new URLSearchParams(location.search); const m=p.get('maPhieu')||p.get('ma_phieu')||p.get('goPrint')||p.get('MaPhieu')||p.get('code')||''; if(m) input.value=m;})();
 setTimeout(function(){input.focus(); if(input.value) input.select();},80);
 function setStatus(m,k){ if(!m){statusBox.style.display='none';statusBox.textContent='';return;} statusBox.textContent=m; statusBox.className='status '+(k||''); statusBox.style.display='block'; }
-function jsonp(url,cb){ const s=document.createElement('script'); const fn='__cb_'+Date.now()+'_'+Math.floor(Math.random()*9999); let done=false; const t=setTimeout(function(){ if(done)return; done=true; try{delete window[fn];s.remove();}catch(e){} cb({ok:false,error:'Hết chờ (chưa tạo Phiên bản mới?)'}); },40000); window[fn]=function(d){ if(done)return; done=true; clearTimeout(t); try{delete window[fn];s.remove();}catch(e){} cb(d); }; s.onerror=function(){ if(done)return; done=true; clearTimeout(t); try{delete window[fn];s.remove();}catch(e){} cb({ok:false,error:'Không kết nối. Kiểm tra URL Web App: '+WEB_APP_URL}); }; s.src=url+(url.indexOf('?')>-1?'&':'?')+'callback='+fn; document.body.appendChild(s); }
+// fetch ưu tiên (CORS * từ GAS) — JSONP <script> hay fail trên github.io vì redirect googleusercontent
+function callWebApp(url,cb){
+  const ctrl=typeof AbortController!=='undefined'?new AbortController():null;
+  const t=setTimeout(function(){ try{if(ctrl)ctrl.abort();}catch(e){} },90000);
+  fetch(url,{method:'GET',redirect:'follow',credentials:'omit',cache:'no-store',signal:ctrl?ctrl.signal:undefined})
+    .then(function(res){
+      if(!res.ok) throw new Error('HTTP '+res.status);
+      return res.text();
+    })
+    .then(function(txt){
+      clearTimeout(t);
+      var d;
+      try{ d=JSON.parse(txt); }catch(e){
+        var m=String(txt||'').match(/^[^(]+\(([\s\S]*)\)\s*;?\s*$/);
+        if(m) d=JSON.parse(m[1]); else throw new Error('Phản hồi không phải JSON');
+      }
+      cb(d);
+    })
+    .catch(function(err){
+      clearTimeout(t);
+      jsonpFallback(url,cb,err&&err.name==='AbortError'?'Hết chờ (sync lâu / chưa Deploy mới?)':'Không kết nối: '+(err&&err.message||err)+'\nURL: '+WEB_APP_URL);
+    });
+}
+function jsonpFallback(url,cb,failMsg){
+  var s=document.createElement('script');
+  var fn='__cb_'+Date.now()+'_'+Math.floor(Math.random()*9999);
+  var done=false;
+  var t=setTimeout(function(){ if(done)return; done=true; try{delete window[fn];s.remove();}catch(e){} cb({ok:false,error:failMsg||'Hết chờ (JSONP)'}); },40000);
+  window[fn]=function(d){ if(done)return; done=true; clearTimeout(t); try{delete window[fn];s.remove();}catch(e){} cb(d); };
+  s.onerror=function(){ if(done)return; done=true; clearTimeout(t); try{delete window[fn];s.remove();}catch(e){} cb({ok:false,error:failMsg||('Không kết nối. Kiểm tra URL Web App: '+WEB_APP_URL)}); };
+  s.src=url+(url.indexOf('?')>-1?'&':'?')+'callback='+fn;
+  document.body.appendChild(s);
+}
 btnClear.onclick=function(){input.value='';input.focus();setStatus('','');};
 input.addEventListener('keydown',function(e){if(e.key==='Enter'){e.preventDefault();doPrint();}});
 function openPdf(p){ const pdf=p||PDF_URL_BASE; const a=document.createElement('a'); a.href=pdf; a.target='_blank'; a.rel='noopener'; document.body.appendChild(a); a.click(); setTimeout(function(){a.remove(); window.open(pdf,'_blank');},350); }
-// 1 NÚT DUY NHẤT: B1 chạy syncLarkBaseToSheet() FULL -> B2 điền B3:C3 (gid=614955341) -> PDF
+// 1 NÚT: B1 sync 1 phiếu theo Mã Phiếu -> B2 điền B3:C3 -> PDF (nhanh, ổn định trên GitHub Pages)
 function doPrint(){
   const ma=input.value.trim(); if(!ma){setStatus('Vui lòng nhập Mã Phiếu','err');input.focus();return;}
-  setStatus('đang sync...','loading'); btnPrint.disabled=true;
+  setStatus('đang sync + chuẩn bị PDF...','loading'); btnPrint.disabled=true;
   const url=WEB_APP_URL+'?action=syncAndPrint&maPhieu='+encodeURIComponent(ma)+'&t='+Date.now();
-  jsonp(url,function(r){
+  callWebApp(url,function(r){
     if(!r||!r.ok){
-      const msg='Lỗi sync: '+(r&&r.error||'Hết chờ')+'\n→ Triển khai Phiên bản mới (Bất kỳ ai) rồi copy URL mới vào WEB_APP_URL';
+      const msg='Lỗi sync: '+(r&&r.error||'Hết chờ')+'\n→ Apps Script: Deploy → Manage deployments → Edit → New version → Who has access: Anyone';
       setStatus(msg,'err'); btnPrint.disabled=false;
-      const b=new Image(); b.src=WEB_APP_URL+'?action=syncAndPrint&maPhieu='+encodeURIComponent(ma)+'&t='+Date.now();
       setTimeout(function(){setStatus(msg+'\n— vẫn mở PDF sau 1s','err'); openPdf(PDF_URL_BASE);},1500);
       return;
     }
     btnPrint.disabled=false;
-    if(r.sync && !r.sync.ok){ setStatus('syncLarkBaseToSheet: '+r.sync.error+' — vẫn in B3:C3','err'); setTimeout(function(){setStatus('đang in','ok'); openPdf(r.pdfUrl);},700); return; }
+    if(r.sync && !r.sync.ok){ setStatus('sync: '+r.sync.error+' — vẫn in B3:C3','err'); setTimeout(function(){setStatus('đang in','ok'); openPdf(r.pdfUrl);},700); return; }
     setStatus('đang in','ok'); openPdf(r.pdfUrl||PDF_URL_BASE);
   });
 }
