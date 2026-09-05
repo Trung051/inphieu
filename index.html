@@ -126,24 +126,20 @@ function openPdf(p){
 function doPrint(){
   var ma=input.value.trim();
   if(!ma){setStatus('Vui lòng nhập Mã Phiếu','err');input.focus();return;}
-  setStatus('đang sync hôm nay + ghi B3...','loading');
+  setStatus('1/3 sync Lark...','loading');
   btnPrint.disabled=true;
   var url=WEB_APP_URL+'?action=syncAndPrint&maPhieu='+encodeURIComponent(ma)+'&t='+Date.now();
   callWebApp(url,function(r){
     btnPrint.disabled=false;
     if(!r||r.ok===false){
-      var msg='Lỗi: '+(r&&r.error||'Hết chờ')+'\nDeploy New version (Anyone) rồi thử lại';
-      setStatus(msg,'err');
+      setStatus('Lỗi: '+(r&&r.error||'Hết chờ')+'\n→ Copy .gs mới + Deploy New version (Anyone)','err');
       setTimeout(function(){ openPdf(PDF_URL_BASE); },1500);
       return;
     }
     var s=r.sync||{};
-    var n=s.total!=null?s.total:null;
-    if(r._note) setStatus(r._note,'loading');
-    else if(s.ok===false) setStatus('sync ngày lỗi: '+(s.error||'?')+' — vẫn ghi B3 + in','err');
-    else if(s.skipped) setStatus('B3='+ma+' · hôm nay không mới — mở PDF','ok');
-    else setStatus('B3='+ma+(n!=null?' · sync '+n+' phiếu':'')+' — mở PDF','ok');
-    setTimeout(function(){ openPdf(r.pdfUrl||PDF_URL_BASE); },400);
+    if(s.ok===false) setStatus('Sync lỗi: '+(s.error||'?')+'\nVẫn ghi B3='+ma+' + mở PDF','err');
+    else setStatus('OK · sync '+(s.total!=null?s.total:'?')+' phiếu · B3='+ma+' · mở PDF','ok');
+    setTimeout(function(){ openPdf(r.pdfUrl||PDF_URL_BASE); },500);
   },{allowBeaconSuccess:true,timeoutMs:90000});
 }
 btnPrint.onclick=doPrint;
