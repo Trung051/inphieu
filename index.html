@@ -74,38 +74,19 @@ function setStatus(msg, kind){
   statusBox.className = 'status ' + (kind||'');
   statusBox.style.display = 'block';
 }
-// FIX: local chạy python -m http.server thì JSONP ok, nhưng Github -> Apps Script phải dùng JSONP với ?callback=
-// Lỗi "Không kết nối được" là do Apps Script chưa deploy "Bất kỳ ai (Anyone)" -> trả về trang đăng nhập, script onerror.
-// Dùng fetch qua Apps Script JSON API với no-cors không đọc được callback -> phải JSONP.
 function jsonp(url, cb){
   const s = document.createElement('script');
   const fn = '__cb_' + Date.now() + '_' + Math.floor(Math.random()*9999);
-  let done = false;
-  const timeout = setTimeout(function(){
-    if(done) return; done = true;
-    try{ delete window[fn]; document.body.removeChild(s);}catch(e){}
-    cb({ok:false, error:'Hết thời gian chờ. Kiểm tra Web App có deploy "Bất kỳ ai" chưa: ' + WEB_APP_URL});
-  }, 15000);
-  window[fn] = function(d){ if(done) return; done = true; clearTimeout(timeout); try{ delete window[fn]; document.body.removeChild(s);}catch(e){} cb(d); };
-  s.onerror = function(){
-    if(done) return; done = true; clearTimeout(timeout);
-    try{ delete window[fn]; document.body.removeChild(s);}catch(e){}
-    // Thử fetch thường để lấy lỗi chi tiết hơn
-    fetch(url).then(function(r){return r.text();}).then(function(t){
-      cb({ok:false, error:'Không tải được JSONP. Response: ' + t.slice(0,300) + ' — Kiểm tra deploy Ai có quyền = Bất kỳ ai'});
-    }).catch(function(){
-      cb({ok:false, error:'Không kết nối được Apps Script. Kiểm tra deploy Ai có quyền = Bất kỳ ai. URL: ' + WEB_APP_URL});
-    });
-  };
-  s.src = url + (url.indexOf('?')>-1?'&':'?') + 'callback=' + fn;
+  let done=false;
+  const t=setTimeout(function(){ if(done) return; done=true; try{delete window[fn];s.remove();}catch(e){} cb({ok:false,error:'Hết chờ'}); },15000);
+  window[fn]=function(d){ if(done) return; done=true; clearTimeout(t); try{delete window[fn];s.remove();}catch(e){} cb(d); };
+  s.onerror=function(){ if(done) return; done=true; clearTimeout(t); try{delete window[fn];s.remove();}catch(e){} cb({ok:false,error:'Không kết nối được Apps Script. Kiểm tra deploy Ai có quyền = Bất kỳ ai'}); };
+  s.src=url+(url.indexOf('?')>-1?'&':'?')+'callback='+fn;
   document.body.appendChild(s);
 }
 function loadSuggest(){
   jsonp(WEB_APP_URL + '?action=list', function(r){
-    if(!r || !r.ok || !r.list || !r.list.length){
-      // không báo lỗi ở đây, chỉ gợi ý thôi
-      return;
-    }
+    if(!r || !r.ok || !r.list || !r.list.length) return;
     suggestBox.innerHTML='';
     r.list.slice(0,12).forEach(function(ma){
       const b=document.createElement('button');
@@ -127,15 +108,19 @@ function doPrint(){
   const url = WEB_APP_URL + '?action=setPrint&maPhieu=' + encodeURIComponent(ma);
   jsonp(url, function(r){
     btnPrint.disabled = false;
-    if(!r || !r.ok){ setStatus('Lỗi: ' + (r&&r.error||'Không điền được B3:C3 — thử mở ' + WEB_APP_URL + '?action=ping xem có đăng nhập không'), 'err'); return; }
+    if(!r || !r.ok){ setStatus('Lỗi: ' + (r&&r.error||'Không điền được B3:C3'), 'err'); return; }
     setStatus('đang in', 'ok');
-    // Vào thẳng chế độ in HTML A4 (đã điền B3:C3 trên In phiếu thu máy) — không qua Sheet
-    const printUrl = r.printUrl || (WEB_APP_URL + '?page=print&maPhieu=' + encodeURIComponent(ma));
-    // Mở trong iframe ẩn cũng được nhưng popup blocker sẽ chặn nếu không phải click trực tiếp -> dùng window.open ngay sau jsonp callback vẫn ok vì cùng tick user
-    const win = window.open(printUrl, '_blank');
-    if(!win){
-      setStatus('Popup bị chặn! Hãy cho phép popup cho ' + location.host + ' rồi bấm In lại', 'err');
-    }
+    // Đẩy mã vào Sheet rồi export thẳng PDF của In phiếu thu máy (gid=614955341) để tải luôn - khỏi qua Sheet
+    const pdf = r.pdfUrl || ('https://docs.google.com/spreadsheets/d/1nvU46bxWHOo9itAQc4I2bun3dZ6VGRAU_8BNLVUB0Eg/export?format=pdf&gid=614955341&portrait=true&size=A4&fitw=true&sheetnames=false&printtitle=false&pagenumbers=false&gridlines=false&fzr=false');
+    // Tải PDF luôn: dùng link tải, trình duyệt sẽ download hoặc preview để in
+    // Thử trigger download bằng thẻ a ẩn
+    const a=document.createElement('a');
+    a.href=pdf;
+    a.download='Phieu_'+ma+'.pdf';
+    a.target='_blank';
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(function(){a.remove(); window.open(pdf,'_blank');},400);
   });
 }
 btnPrint.onclick = doPrint;
