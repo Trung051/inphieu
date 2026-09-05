@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>In Phiếu Thu Cũ - Nhập Mã Phiếu</title>
+<style>
+  :root{--blue:#1a73e8;--bg:#f8f9fa;--card:#fff;--border:#dadce0;--text:#202124}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Segoe UI',Roboto,Arial,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
+  .wrap{width:100%;max-width:480px}
+  .card{background:var(--card);border:1px solid var(--border);border-radius:16px;box-shadow:0 4px 24px rgba(0,0,0,.08);overflow:hidden}
+  .head{background:var(--blue);color:#fff;padding:18px 20px;display:flex;align-items:center;gap:12px}
+  .head .icon{width:40px;height:40px;border-radius:999px;background:rgba(255,255,255,.22);display:flex;align-items:center;justify-content:center;font-size:22px}
+  .head h1{font-size:15px}
+  .body{padding:20px}
+  label{font-size:13px;font-weight:600;display:block;margin-bottom:6px}
+  .input-row{display:flex;gap:8px}
+  input[type=text]{flex:1;padding:12px 14px;border:1.5px solid var(--border);border-radius:10px;font-size:16px;outline:none}
+  input[type=text]:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(26,115,232,.15)}
+  .suggest{margin-top:8px;display:flex;flex-wrap:wrap;gap:6px;min-height:22px}
+  .chip{font-size:12px;padding:6px 10px;border-radius:999px;border:1px solid var(--border);background:#fff;cursor:pointer}
+  .chip:hover{border-color:var(--blue);color:var(--blue);background:#e8f0fe}
+  .actions{margin-top:16px}
+  .btn{width:100%;padding:12px 16px;border-radius:10px;border:1px solid var(--border);font-size:14px;font-weight:700;cursor:pointer;background:#fff}
+  .btn-primary{background:var(--blue);color:#fff;border-color:var(--blue)}
+  .btn:disabled{opacity:.5;cursor:not-allowed}
+  .status{margin-top:12px;font-size:13px;padding:10px 12px;border-radius:10px;display:none}
+  .status.ok{background:#e6f4ea;color:#0d652d;border:1px solid #a8dab5;display:block}
+  .status.err{background:#fce8e6;color:#b3261e;border:1px solid #f2b8b5;display:block}
+  .status.loading{background:#e8f0fe;color:#174ea6;border:1px solid #aecbfa;display:block}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="card">
+    <div class="head">
+      <div class="icon">🖨️</div>
+      <div><h1>IN PHIẾU THU CŨ</h1></div>
+    </div>
+    <div class="body">
+      <label for="maPhieuInput">Mã Phiếu <span style="color:#d93025">*</span></label>
+      <div class="input-row">
+        <input id="maPhieuInput" type="text" placeholder="VD: PNM0039" autocomplete="off">
+        <button id="btnClear" class="btn" style="width:auto;flex:0 0 auto;padding:10px 14px" title="Xóa">✕</button>
+      </div>
+      <div id="suggestBox" class="suggest"></div>
+      <div class="actions">
+        <button id="btnPrint" class="btn btn-primary">🖨️ In phiếu</button>
+      </div>
+      <div id="statusBox" class="status"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Iframe ẩn để tải PDF - sẽ tự bật hộp thoại in của trình duyệt -->
+<iframe id="printFrame" style="display:none;width:0;height:0;border:0"></iframe>
+
+<script>
+const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbz9dLjloP-W6_BF-f_6nq2aROliCoxCe326PVidEZ7qm2aSvo7Et73YLISWT1lsXjkB/exec';
+const input = document.getElementById('maPhieuInput');
+const btnPrint = document.getElementById('btnPrint');
+const btnClear = document.getElementById('btnClear');
+const statusBox = document.getElementById('statusBox');
+const suggestBox = document.getElementById('suggestBox');
+const printFrame = document.getElementById('printFrame');
+
+(function(){
+  const p = new URLSearchParams(location.search);
+  const m = p.get('maPhieu') || p.get('ma_phieu') || p.get('goPrint') || p.get('MaPhieu') || p.get('code') || '';
+  if(m) input.value = m;
+})();
+setTimeout(function(){ input.focus(); if(input.value) input.select(); }, 120);
+
+function setStatus(msg, kind){
+  if(!msg){ statusBox.style.display='none'; statusBox.textContent=''; return; }
+  statusBox.textContent = msg;
+  statusBox.className = 'status ' + (kind||'');
+  statusBox.style.display = 'block';
+}
+function jsonp(url, cb){
+  const s = document.createElement('script');
+  const fn = '__cb_' + Date.now() + '_' + Math.floor(Math.random()*9999);
+  window[fn] = function(d){ delete window[fn]; document.body.removeChild(s); cb(d); };
+  s.onerror = function(){ delete window[fn]; try{document.body.removeChild(s);}catch(e){} cb({ok:false,error:'Không kết nối được Apps Script. Kiểm tra deploy Ai có quyền = Bất kỳ ai'}); };
+  s.src = url + (url.indexOf('?')>-1?'&':'?') + 'callback=' + fn;
+  document.body.appendChild(s);
+}
+function loadSuggest(){
+  jsonp(WEB_APP_URL + '?action=list', function(r){
+    if(!r || !r.ok || !r.list || !r.list.length) return;
+    suggestBox.innerHTML='';
+    r.list.slice(0,12).forEach(function(ma){
+      const b=document.createElement('button');
+      b.type='button'; b.className='chip'; b.textContent=ma;
+      b.onclick=function(){ input.value=ma; setStatus('Đã chọn ' + ma,'ok'); };
+      suggestBox.appendChild(b);
+    });
+  });
+}
+loadSuggest();
+btnClear.onclick = function(){ input.value=''; input.focus(); setStatus('',''); };
+input.addEventListener('keydown', function(e){ if(e.key==='Enter'){ e.preventDefault(); doPrint(); } });
+
+// Gọi OAuth token để fetch PDF trực tiếp từ Google (không bị chặn iframe) - fallback dùng window.open nếu không lấy được token
+function openPdfPrint(pdfUrl){
+  // Cách 1: thử mở PDF trong tab mới - trình duyệt sẽ hiện preview để in luôn, không qua Sheet
+  // Dùng iframe trước để không bị popup blocker vì đã trong handler click
+  try{
+    printFrame.src = pdfUrl;
+    // Sau 1s cũng mở tab mới để chắc chắn hiện hộp thoại nếu iframe bị chặn
+    setTimeout(function(){ window.open(pdfUrl, '_blank'); }, 800);
+  }catch(e){
+    window.open(pdfUrl, '_blank');
+  }
+  // Sau khi iframe load PDF, tự gọi print của iframe (nhiều trình duyệt hỗ trợ)
+  printFrame.onload = function(){
+    try{ printFrame.contentWindow.print(); }catch(e){}
+  };
+}
+
+function doPrint(){
+  const ma = input.value.trim();
+  if(!ma){ setStatus('Vui lòng nhập Mã Phiếu', 'err'); input.focus(); return; }
+  setStatus('đang in', 'loading');
+  btnPrint.disabled = true;
+  const url = WEB_APP_URL + '?action=setPrint&maPhieu=' + encodeURIComponent(ma);
+  jsonp(url, function(r){
+    btnPrint.disabled = false;
+    if(!r || !r.ok){ setStatus('Lỗi: ' + (r&&r.error||'Không điền được B3:C3'), 'err'); return; }
+    setStatus('đang in', 'ok');
+    // Export thẳng PDF của In phiếu thu máy (gid=614955341) A4 vừa trang - khỏi chuyển hướng qua Sheet
+    if(r.pdfUrl){
+      openPdfPrint(r.pdfUrl);
+    } else {
+      // fallback
+      const pdf = 'https://docs.google.com/spreadsheets/d/1nvU46bxWHOo9itAQc4I2bun3dZ6VGRAU_8BNLVUB0Eg/export?format=pdf&gid=614955341&portrait=true&size=A4&fitw=true&sheetnames=false&printtitle=false&pagenumbers=false&gridlines=false&fzr=false';
+      openPdfPrint(pdf);
+    }
+  });
+}
+btnPrint.onclick = doPrint;
+</script>
+</body>
+</html>
