@@ -13,7 +13,7 @@
   .head{background:var(--blue);color:#fff;padding:10px 14px;text-align:center}
   .head h1{font-size:13px;font-weight:700;letter-spacing:.3px}
   .body{padding:14px}
-  label{font-size:11px;font-weight:600;color:var(--text);display:block;margin-bottom:5px}
+  label{font-size:11px;font-weight:600;display:block;margin-bottom:5px}
   label span{color:#d93025}
   .input-row{display:flex;gap:6px}
   input[type=text]{flex:1;padding:7px 10px;border:1.2px solid var(--border);border-radius:7px;font-size:12.5px;outline:none;background:#fff}
@@ -80,9 +80,9 @@ function jsonp(url, cb){
   const s = document.createElement('script');
   const fn = '__cb_' + Date.now() + '_' + Math.floor(Math.random()*9999);
   let done=false;
-  const t=setTimeout(function(){ if(done) return; done=true; try{delete window[fn];s.remove();}catch(e){} cb({ok:false,error:'Hết chờ'}); },12000);
+  const t=setTimeout(function(){ if(done) return; done=true; try{delete window[fn];s.remove();}catch(e){} cb({ok:false,error:'Hết chờ'}); },18000);
   window[fn]=function(d){ if(done) return; done=true; clearTimeout(t); try{delete window[fn];s.remove();}catch(e){} cb(d); };
-  s.onerror=function(){ if(done) return; done=true; clearTimeout(t); try{delete window[fn];s.remove();}catch(e){} cb({ok:false,error:'Không kết nối được Apps Script'}); };
+  s.onerror=function(){ if(done) return; done=true; clearTimeout(t); try{delete window[fn];s.remove();}catch(e){} cb({ok:false,error:'Không kết nối'}); };
   s.src=url+(url.indexOf('?')>-1?'&':'?')+'callback='+fn;
   document.body.appendChild(s);
 }
@@ -102,32 +102,36 @@ loadSuggest();
 btnClear.onclick = function(){ input.value=''; input.focus(); setStatus('',''); };
 input.addEventListener('keydown', function(e){ if(e.key==='Enter'){ e.preventDefault(); doPrint(); } });
 
+function openPdf(pdfUrl){
+  const pdf = pdfUrl || PDF_URL_BASE;
+  const a=document.createElement('a'); a.href=pdf; a.target='_blank'; a.rel='noopener';
+  document.body.appendChild(a); a.click();
+  setTimeout(function(){ a.remove(); window.open(pdf,'_blank'); }, 400);
+}
+
 function doPrint(){
   const ma = input.value.trim();
   if(!ma){ setStatus('Vui lòng nhập Mã Phiếu', 'err'); input.focus(); return; }
-  setStatus('đang in', 'loading');
+  // NÚT IN GIỜ LÀM 2 BƯỚC: 1) sync phiếu đó từ Lark về Sheet (~1s), 2) đẩy B3:C3 và mở PDF
+  // Luôn hiện rõ bước đang làm để không tưởng đứng, và tăng tốc bằng /records/search chỉ lấy 1 record
+  setStatus('đang sync...', 'loading');
   btnPrint.disabled = true;
+
   const url = WEB_APP_URL + '?action=setPrint&maPhieu=' + encodeURIComponent(ma) + '&t=' + Date.now();
-  // Dùng Image beacon để không bị chặn CORS/redirect như JSONP cũ -> Github -> Apps Script luôn đẩy B3:C3 thành công
-  // Dù JSONP lỗi vẫn đẩy được vì Image GET đã tới server
-  let opened=false;
-  function openPdf(pdfUrl){
-    if(opened) return; opened=true;
-    btnPrint.disabled=false;
-    setStatus('đang in','ok');
-    const pdf = pdfUrl || PDF_URL_BASE;
-    const a=document.createElement('a'); a.href=pdf; a.target='_blank'; document.body.appendChild(a); a.click();
-    setTimeout(function(){ a.remove(); window.open(pdf,'_blank'); }, 400);
-  }
-  const beacon = new Image();
-  let timer = setTimeout(function(){ openPdf(PDF_URL_BASE); }, 1800);
-  beacon.onload = beacon.onerror = function(){ clearTimeout(timer); setTimeout(function(){ openPdf(PDF_URL_BASE); }, 600); };
-  beacon.src = url;
-  // Song song thử JSONP để lấy pdfUrl chính xác (có gid mới nếu đổi sheet)
+  // Dùng JSONP để lấy pdfUrl chính xác; beacon Image cũ bị chặn redirect trên Github -> bỏ
   jsonp(url, function(r){
-    clearTimeout(timer);
-    if(r && r.ok && r.pdfUrl) openPdf(r.pdfUrl);
-    // nếu JSONP lỗi nhưng beacon đã gửi thì vẫn openPdf ở trên
+    btnPrint.disabled = false;
+    if(!r || !r.ok){
+      // Nếu syncOne thất bại (ví dụ base chưa hỗ trợ search) vẫn cho in bằng data cũ trong Mirror
+      setStatus('Lỗi sync: ' + (r&&r.error||'không rõ') + ' — thử in bằng dữ liệu cũ', 'err');
+      // vẫn đẩy B3:C3 và mở PDF bằng beacon Image fallback
+      const beacon = new Image();
+      beacon.src = WEB_APP_URL + '?action=setPrint&maPhieu=' + encodeURIComponent(ma) + '&t=' + Date.now();
+      setTimeout(function(){ setStatus('đang in','ok'); openPdf(r&&r.pdfUrl||PDF_URL_BASE); }, 800);
+      return;
+    }
+    setStatus('đang in','ok');
+    openPdf(r.pdfUrl);
   });
 }
 btnPrint.onclick = doPrint;
