@@ -146,8 +146,10 @@ btnPrint.onclick=doPrint;
 
 setStatus('đang kiểm tra Web App...','loading');
 callWebApp(WEB_APP_URL+'?action=ping&t='+Date.now(),function(r){
-  if(r&&r.ok) setStatus('Web App OK'+(r.cols?' · '+r.cols+' cột':''),'ok');
-  else setStatus('Web App lỗi:\n'+(r&&r.error||'?'),'err');
+  if(r&&r.ok){
+    var b=r.build||'(cũ — chưa Deploy sync-only-v3)';
+    setStatus('Web App OK · build='+b+(r.cols?' · '+r.cols+' cột':''),(r.build==='sync-only-v3'?'ok':'err'));
+  } else setStatus('Web App lỗi:\n'+(r&&r.error||'?'),'err');
 },{allowBeaconSuccess:false,timeoutMs:15000});
 </script>
 </body>
